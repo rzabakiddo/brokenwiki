@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Brokenwiki - rary</title>
+    <script type="text/javascript">
+        const URL_RARES = 'https://apigenerator.dronahq.com/api/1pxNWY4Z/rares';
+        const URL_PSYCHORARES = 'https://apigenerator.dronahq.com/api/VBionWbJ/psychorares';
+        const URL_SYNERG = 'https://apigenerator.dronahq.com/api/r6dfj6-J/synergists';
+        const URL_BASE = 'https://brokenwiki.pl';
+        const URL_STAR = 'https://brokenwiki.pl/img/otherIcons/stars.png';
+
+        var JSON_RARES = {};
+        var JSON_PSYCHORARES = {};
+        var JSON_SYNERG = {};
+
+        function urlProcess() {
+            fetch(URL_RARES, {
+                "body": null,
+                "method": "GET"
+            }).then(response => response.json())
+                .then(data => {
+                    JSON_RARES = data;
+                    fetch(URL_PSYCHORARES, {
+                        "body": null,
+                        "method": "GET"
+                    }).then(response => response.json())
+                        .then(data => {
+                            JSON_PSYCHORARES = data;
+                            fetch(URL_SYNERG, {
+                                "body": null,
+                                "method": "GET"
+                            }).then(response => response.json())
+                                .then(data => {
+                                    JSON_SYNERG = data;
+                                    loopRaresNPsycho();
+                                    createHTML();
+                                });
+                        });
+                });
+        }
+
+        urlProcess();
+
+        const bossMap = new Map();
+        const synergMap = new Map();
+        const detailMap = new Map();
+
+
+        function loopRaresNPsycho() {
+            let i = 0;
+            while (i < JSON_RARES.length) {
+                sortBoss(JSON_RARES[i])
+                detailed(JSON_RARES[i])
+                i++;
+            }
+            i = 0;
+            while (i < JSON_PSYCHORARES.length) {
+                sortBoss(JSON_PSYCHORARES[i])
+                detailed(JSON_PSYCHORARES[i])
+                i++;
+            }
+            i = 0;
+            while (i < JSON_SYNERG.length) {
+                sortSynergLvl(JSON_SYNERG[i]);
+                detailed(JSON_SYNERG[i])
+                i++;
+            }
+        }
+
+        // "ikona": "/img/equipmentIcons/rares/berglisy.png",
+        //     "gwiazdki": "/img/otherIcons/stars.png",
+        //     "nazwa": "Berglisy",
+        //     "ranga": "V",
+        //     "wartosc": "1 200 000",
+        //     "waga": "5",
+        //     "wytrzymalosc": "35-50%",
+        //     "wymagany_poziom": "60",
+        //     "wymagana_wiedza": "Wymagana wiedza: 60",
+        //     "moc": "Moc: +12",
+        //     "wiedza": "Wiedza: +18",
+        //     "zycie": "PŻ: +240",
+        //     "mana": "Mana: +60",
+        //     "rzadkosc": "wszystko, legendarny",
+        //     "psycho_filtr": "wszystko",
+        //     "typ": "wszystko, karwasze",
+        //     "boss": "Tygrys, Fyodor",
+        //     "dropukryty": "wszystko, Tygrys, Fyodor",
+        //     "id": 87
+
+
+        function detailed(json) {
+            if (json != undefined) {
+                applyAll(json);
+            }
+        }
+
+        function sortBoss(json) {
+            if (json.boss != undefined) {
+                let map = bossMap.get(json.boss);
+                if (json.typ == "wszystko, zoologiczne" || json.typ == "wszystko, karwasze")
+                    return;
+                if (map != undefined) {
+                    bossMap.set(json.boss, map + "|" + json.nazwa)
+                } else {
+                    bossMap.set(json.boss, json.nazwa);
+                }
+            }
+        }
+
+        function sortSynergLvl(json) {
+            if (json.wymagany_poziom != undefined) {
+                let map = synergMap.get(json.wymagany_poziom);
+                if (map != undefined) {
+                    synergMap.set(json.wymagany_poziom, map + "|" + json.nazwa)
+                } else {
+                    synergMap.set(json.wymagany_poziom, json.nazwa);
+                }
+            }
+        }
+
+        function applyAll(item) {
+            if (item.nazwa != undefined) {
+                let icon = item.ikona;
+                let isStar = item.gwiazdki != "";
+                let rank = item.ranga;
+                let price = item.wartosc;
+                let weight = item.waga;
+                let psycho = item.psycho;
+                let requirements = {
+                    "level": item.wymagany_poziom,
+                    "wiedza": item.wymagana_wiedza,
+                    "zreka": item.wymagana_zrecznosc,
+                    "moc": item.wymagana_moc,
+                    "sila": item.wymagana_sila
+                }
+                let stats = {
+                    "moc": item.moc,
+                    "wiedza": item.wiedza,
+                    "sila": item.sila,
+                    "zreka": item.zrecznosc,
+                    "konda": item.kondycja,
+                    "mana": item.mana,
+                    "hp": item.zycie
+                }
+                let res = {
+                    "siek": item.odp_sieczne,
+                    "obuch": item.odp_obuchowe,
+                    "klute": item.odp_klute,
+                    "ogien": item.odp_ogien,
+                    "zimno": item.odp_zimno,
+                    "ene": item.odp_ene,
+                    "uro": item.odp_uro
+                }
+                let isSynerg = false;
+                if(item.rzadkosc != undefined)
+                    isSynerg = item.rzadkosc.indexOf("synergetyk") != -1;
+                detailMap.set(item.nazwa, [icon, isStar, rank, price, weight, psycho, requirements, stats, res, isSynerg]);
+            }
+        }
+
+        function createHTML() {
+            let text = '';
+            let i = 0;
+            while (i < bossMap.size) {
+                let dataElement = bossMap.get(Array.from(bossMap.keys())[i]);
+                text += '<div class="boss">'
+                text += '<h3 class="name">' + Array.from(bossMap.keys())[i] + '</h3>'
+                text += '<div class="rares">'
+                let dataSplit = dataElement.split("|");
+                let className = "";
+                switch (dataSplit.length) {
+                    case 5:
+                        className = "max";
+                        break;
+                    case 4:
+                        className = "more";
+                        break;
+                    case 6:
+                        className = "truemax";
+                        break;
+                }
+                let j = 0;
+                while (j < dataSplit.length) {
+                    text += '<div class="rare ' + className + '">'
+                    let itemArray = detailMap.get(dataSplit[j])
+                    //     0
+                    // :
+                    //     "/img/equipmentIcons/rares/derengil.png"
+                    //     1
+                    // :
+                    //     false
+                    //     2
+                    // :
+                    //     "II"
+                    //     3
+                    // :
+                    //     "36 000"
+                    //     4
+                    // :
+                    //     "2"
+                    //     5
+                    // :
+                    //     undefined
+                    //     6
+                    // :
+                    //     {level: '18', wiedza: undefined, zreka: undefined, moc: undefined, sila: 'Wymagana siła: 20'}
+                    //     7
+                    // :
+                    //     {moc: undefined, wiedza: undefined, sila: 'Siła: +8', zreka: 'Zręczność: +6', konda: 'Kondycja: +40', …}
+                    //     8
+                    // :
+                    //     {siek: undefined, obuch: undefined, klute: undefined, ogien: undefined, zimno: undefined, …}
+
+                    text += '<h4 class="rname">' + dataSplit[j] + '</h4>'
+                    text += '<img src="' + (URL_BASE + itemArray[0]) + '">'
+                    if (itemArray[1])
+                        text += '<br><img src="' + URL_STAR + '">'
+                    let psycho = itemArray[5];
+                    text += parseTag("h3", "Ranga: " + itemArray[2] +" | " + "Cena: " + itemArray[3] +" | " + "Waga: " + itemArray[4])
+                    text += '<hr>'
+                    text += parseTag("h2", "Wymagania", 'black', '1em')
+                    text += '<hr><br>'
+                    let req = itemArray[6];
+                    text += parseTag("h3", "Wymagany poziom: " + req.level)
+                    if (req.wiedza != undefined)
+                        text += parseTag("h3", req.wiedza)
+                    if (req.sila != undefined)
+                        text += parseTag("h3", req.sila)
+                    if (req.moc != undefined)
+                        text += parseTag("h3", req.moc)
+                    if (req.zreka != undefined)
+                        text += parseTag("h3", req.zreka)
+                    text += '<hr>'
+                    text += parseTag("h2", "Statystyki", 'black', '1em')
+                    text += '<hr><br>'
+                    req = itemArray[7];
+                    if (req.wiedza != undefined)
+                        text += parseTag("h3", req.wiedza)
+                    if (req.sila != undefined)
+                        text += parseTag("h3", req.sila)
+                    if (req.moc != undefined)
+                        text += parseTag("h3", req.moc)
+                    if (req.zreka != undefined)
+                        text += parseTag("h3", req.zreka)
+                    if (req.konda != undefined)
+                        text += parseTag("h3", req.konda)
+                    if (req.hp != undefined)
+                        text += parseTag("h3", req.hp)
+                    if (req.mana != undefined)
+                        text += parseTag("h3", req.mana)
+
+                    req = itemArray[8];
+                    let lTest = "";
+                    if (req.siek != undefined)
+                        lTest += parseTag("h3", req.siek)
+                    if (req.obuch != undefined)
+                        lTest += parseTag("h3", req.obuch)
+                    if (req.klute != undefined)
+                        lTest += parseTag("h3", req.klute)
+                    if (req.uro != undefined)
+                        lTest += parseTag("h3", req.uro, "#816")
+                    if (req.ogien != undefined)
+                        lTest += parseTag("h3", req.ogien, "#840")
+                    if (req.ene != undefined)
+                        lTest += parseTag("h3", req.ene, "#0aa")
+                    if (req.zimno != undefined)
+                        lTest += parseTag("h3", req.zimno, "#04a")
+                    if(lTest.length>0) {
+                        text += '<hr>'
+                        text += parseTag("h2", "Resy", 'black', '1em')
+                        text += '<hr><br>'
+                        text+=lTest;
+                    }
+                    if (psycho != undefined) {
+                        text += '<hr><br>'
+                        text += parseTag("h2", psycho, "#07a", '.6em', 'font-weight: 400')
+                    }
+                    text += '</div>'
+                    j++;
+                }
+                text += '</div>'
+                text += '</div>'
+                i++;
+            }
+            let texts = '';
+            i = 0;
+            while (i < synergMap.size) {
+                let dataElement = synergMap.get(Array.from(synergMap.keys())[i]);
+                texts += '<div class="boss">'
+                texts += '<h3 class="name">Na level: ' +Array.from(synergMap.keys())[i] + '</h3>'
+                texts += '<div class="rares">'
+                let dataSplit = dataElement.split("|");
+                let className = "syn";
+                let j = 0;
+                while (j < dataSplit.length) {
+                    texts += '<div class="rare ' + className + '">'
+                    let itemArray = detailMap.get(dataSplit[j])
+                    //     0
+                    // :
+                    //     "/img/equipmentIcons/rares/derengil.png"
+                    //     1
+                    // :
+                    //     false
+                    //     2
+                    // :
+                    //     "II"
+                    //     3
+                    // :
+                    //     "36 000"
+                    //     4
+                    // :
+                    //     "2"
+                    //     5
+                    // :
+                    //     undefined
+                    //     6
+                    // :
+                    //     {level: '18', wiedza: undefined, zreka: undefined, moc: undefined, sila: 'Wymagana siła: 20'}
+                    //     7
+                    // :
+                    //     {moc: undefined, wiedza: undefined, sila: 'Siła: +8', zreka: 'Zręczność: +6', konda: 'Kondycja: +40', …}
+                    //     8
+                    // :
+                    //     {siek: undefined, obuch: undefined, klute: undefined, ogien: undefined, zimno: undefined, …}
+
+                    texts += '<h4 class="rname">' + dataSplit[j] + '</h4>'
+                    texts += '<img src="' + (URL_BASE + itemArray[0]) + '">'
+                    let psycho = itemArray[5];
+                    texts += parseTag("h3", "Ranga: " + itemArray[2])
+                    texts += parseTag("h3", "Cena: " + itemArray[3])
+                    texts += parseTag("h3", "Waga: " + itemArray[4])
+                    texts += '<hr>'
+                    texts += parseTag("h2", "Wymagania", 'black', '1em')
+                    texts += '<hr><br>'
+                    let req = itemArray[6];
+                    texts += parseTag("h3", "Wymagany poziom: " + req.level)
+                    if (req.wiedza != undefined)
+                        texts += parseTag("h3", req.wiedza)
+                    if (req.sila != undefined)
+                        texts += parseTag("h3", req.sila)
+                    if (req.moc != undefined)
+                        texts += parseTag("h3", req.moc)
+                    if (req.zreka != undefined)
+                        texts += parseTag("h3", req.zreka)
+                    texts += '<hr>'
+                    texts += parseTag("h2", "Statystyki", 'black', '1em')
+                    texts += '<hr><br>'
+                    req = itemArray[7];
+                    if (req.wiedza != undefined)
+                        texts += parseTag("h3", req.wiedza)
+                    if (req.sila != undefined)
+                        texts += parseTag("h3", req.sila)
+                    if (req.moc != undefined)
+                        texts += parseTag("h3", req.moc)
+                    if (req.zreka != undefined)
+                        texts += parseTag("h3", req.zreka)
+                    if (req.konda != undefined)
+                        texts += parseTag("h3", req.konda)
+                    if (req.hp != undefined)
+                        texts += parseTag("h3", req.hp)
+                    if (req.mana != undefined)
+                        texts += parseTag("h3", req.mana)
+
+                    req = itemArray[8];
+                    let lTest = "";
+                    if (req.siek != undefined)
+                        lTest += parseTag("h3", req.siek)
+                    if (req.obuch != undefined)
+                        lTest += parseTag("h3", req.obuch)
+                    if (req.klute != undefined)
+                        lTest += parseTag("h3", req.klute)
+                    if (req.uro != undefined)
+                        lTest += parseTag("h3", req.uro, "#816")
+                    if (req.ogien != undefined)
+                        lTest += parseTag("h3", req.ogien, "#840")
+                    if (req.ene != undefined)
+                        lTest += parseTag("h3", req.ene, "#0aa")
+                    if (req.zimno != undefined)
+                        lTest += parseTag("h3", req.zimno, "#04a")
+                    if(lTest.length>0) {
+                        texts += '<hr>'
+                        texts += parseTag("h2", "Resy", 'black', '1em')
+                        texts += '<hr><br>'
+                        texts+=lTest;
+                    }
+                    if (psycho != undefined) {
+                        texts += '<hr><br>'
+                        texts += parseTag("h2", psycho, "#07a", '.6em', 'font-weight: 400')
+                    }
+                    texts += '</div><br>'
+                    j++;
+                }
+                texts += '</div>'
+                texts += '</div>'
+                i++;
+            }
+            // <div className="rare">
+            //     <h4 className="rname">Rarename</h4>
+            // </div>
+            // <div className="rare">
+            //     <h4 className="rname">Rarename</h4>
+            // </div>
+            // <div className="rare">
+            //     <h4 className="rname">Rarename</h4>
+            // </div>
+            document.getElementById('raresContainer').innerHTML = text;
+            document.getElementById('synergCont').innerHTML = texts;
+        }
+
+        function parseTag(tag, text, color = 'black', fontsize = '.7em', additional = "") {
+            return '<' + tag + ' style="color: ' + color + '; font-size: ' + fontsize + '; ' + additional + '">' + text + '</' + tag + '>'
+        }
+    </script>
+    <style>
+        body {
+            background: #333;
+            margin-right: 1%;
+        }
+        #raresContainer {
+            width: 100%;
+            border: #bdaf90 3px solid;
+            background: #aaa;
+        }
+        #synergCont {
+             width: 100%;
+             border: #af0f70 3px solid;
+             background: #aaa;
+            display: inline-block;
+         }
+
+        .boss {
+            width: 95%;
+            margin-left: 2.5%;
+            border: black 1px solid;
+            margin-bottom: 1%;
+            margin-top: 1%;
+            font-family: Arial;
+        }
+
+        .name {
+            text-align: center;
+        }
+
+        h4 {
+            font-weight: lighter;
+        }
+
+        .rares {
+            margin-top: 1%;
+            width: 90%;
+            margin-left: 5%;
+            margin-bottom: 1%;
+            display: flex;
+            flex-wrap: wrap;
+            font-size: 1.5vw;
+        }
+
+        .rare {
+            text-align: center;
+            margin-top: 1vh;
+            margin-bottom: 1vh;
+            width: 30%;
+            margin-left: 2%;
+            border: 1px solid black;
+        }
+
+        .more {
+            text-align: center;
+            margin-top: 1vh;
+            margin-bottom: 1vh;
+            width: 22%;
+            margin-left: 2%;
+            border: 1px solid black;
+        }
+
+        .max {
+            text-align: center;
+            margin-top: 1vh;
+            margin-bottom: 1vh;
+            width: 17.2%;
+            margin-left: 2%;
+            border: 1px solid black;
+        }
+
+        .truemax {
+            text-align: center;
+            margin-top: 1vh;
+            margin-bottom: 1vh;
+            width: 14.2%;
+            margin-left: 2%;
+            border: 1px solid black;
+        }
+
+        .syn {
+            text-align: center;
+            margin-top: 1vh;
+            margin-bottom: 1vh;
+            width: 13%;
+            margin-left: 1%;
+            border: 1px solid black;
+        }
+
+    </style>
+</head>
+<body>
+<div id="raresContainer">
+
+</div>
+<br>
+<div id="synergCont">
+
+</div>
+</body>
+</html>
